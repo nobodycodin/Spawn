@@ -1,0 +1,171 @@
+-- Services
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MM2ControlUI"
+screenGui.Parent = playerGui
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+
+-- Main Frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 350, 0, 250)
+frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BackgroundTransparency = 0.05
+frame.Parent = screenGui
+
+-- Rounded corners
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = frame
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Text = "MM2 Utility Panel"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 22
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.BackgroundTransparency = 1
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Parent = frame
+
+-- Buttons container
+local container = Instance.new("Frame")
+container.Size = UDim2.new(1, -40, 1, -60)
+container.Position = UDim2.new(0, 20, 0, 50)
+container.BackgroundTransparency = 1
+container.Parent = frame
+
+-- Button Template
+local function createButton(name, text, order)
+	local button = Instance.new("TextButton")
+	button.Name = name
+	button.Text = text
+	button.Font = Enum.Font.Gotham
+	button.TextSize = 18
+	button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	button.Size = UDim2.new(1, 0, 0, 40)
+	button.Position = UDim2.new(0, 0, 0, (order - 1) * 50)
+	button.Parent = container
+
+	local uiCorner = Instance.new("UICorner")
+	uiCorner.CornerRadius = UDim.new(0, 8)
+	uiCorner.Parent = button
+
+	return button
+end
+
+-- Buttons
+local spawnBtn = createButton("SpawnBtn", "Spawn", 1)
+local tradeFreezeBtn = createButton("TradeFreezeBtn", "Trade Freezer [OFF]", 2)
+local hideGoodiesBtn = createButton("HideGoodiesBtn", "Hide Goodies [OFF]", 3)
+
+-- State Variables
+local tradeFreezeEnabled = false
+local hideGoodiesEnabled = false
+
+-- ð§  Spawn Logic
+spawnBtn.MouseButton1Click:Connect(function()
+	spawnBtn.Text = "Spawning..."
+	spawnBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+
+	task.wait(1)
+
+	local WeaponOwnedRange = { min = 1, max = 150 }
+	local DataBase = require(game:GetService("ReplicatedStorage").Database.Sync.Item)
+	local PlayerData = require(game:GetService("ReplicatedStorage").Modules.ProfileData)
+
+	local newOwned = {}
+	for i, v in pairs(DataBase) do
+		newOwned[i] = math.random(WeaponOwnedRange.min, WeaponOwnedRange.max)
+	end
+
+	local PlayerWeapons = PlayerData.Weapons
+
+	RunService:BindToRenderStep("InventoryUpdate", 0, function()
+		PlayerWeapons.Owned = newOwned
+	end)
+
+	local char = player.Character
+	if char then
+		char:BreakJoints()
+	end
+
+	spawnBtn.Text = "Spawned ð¥"
+	task.wait(1)
+	spawnBtn.Text = "Spawn"
+	spawnBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+end)
+
+-- Fake Toggles
+tradeFreezeBtn.MouseButton1Click:Connect(function()
+	tradeFreezeEnabled = not tradeFreezeEnabled
+	tradeFreezeBtn.Text = "Trade Freezer [" .. (tradeFreezeEnabled and "ON" or "OFF") .. "]"
+	tradeFreezeBtn.BackgroundColor3 = tradeFreezeEnabled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(40, 40, 40)
+end)
+
+hideGoodiesBtn.MouseButton1Click:Connect(function()
+	hideGoodiesEnabled = not hideGoodiesEnabled
+	hideGoodiesBtn.Text = "Hide Goodies [" .. (hideGoodiesEnabled and "ON" or "OFF") .. "]"
+	hideGoodiesBtn.BackgroundColor3 = hideGoodiesEnabled and Color3.fromRGB(255, 100, 0) or Color3.fromRGB(40, 40, 40)
+end)
+
+-- â¨ Fake Particle Effects
+for i = 1, 25 do
+	local dot = Instance.new("Frame")
+	dot.Size = UDim2.new(0, math.random(2, 4), 0, math.random(2, 4))
+	dot.Position = UDim2.new(math.random(), 0, math.random(), 0)
+	dot.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+	dot.BackgroundTransparency = 0.2
+	dot.BorderSizePixel = 0
+	dot.ZIndex = 0
+	dot.Parent = frame
+
+	local dotCorner = Instance.new("UICorner")
+	dotCorner.CornerRadius = UDim.new(1, 0)
+	dotCorner.Parent = dot
+
+	local tween = TweenService:Create(dot, TweenInfo.new(math.random(4, 8), Enum.EasingStyle.Linear, Enum.EasingDirection.Out, -1, true), {
+		Position = UDim2.new(math.random(), 0, math.random(), 0),
+		BackgroundTransparency = 0.6
+	})
+	tween:Play()
+end
+
+-- âð± Cross-platform Dragging (Mobile + PC)
+local dragging = false
+local dragStart, startPos
+
+title.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = frame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
